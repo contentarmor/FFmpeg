@@ -3,7 +3,7 @@ Version:        #<PKG_VERS>#
 Release:        1
 ExclusiveArch:  x86_64
 Summary:        FFmpeg shared libraries build by ContentArmor SAS.
-License:        see /usr/share/doc/libffmpeg2.8-ca/copyright
+License:        see /usr/share/doc/libffmpeg3.2.4-ca/copyright
 Vendor:         ContentArmor SAS (http://contentarmor.net/)
 Packager:       ContentArmor SAS <support@contentarmor.net>
 URL:            http://ffmpeg.org/

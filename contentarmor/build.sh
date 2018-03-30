@@ -6,15 +6,14 @@ fi
 
 ROOT_DIR="$(dirname $(readlink -f ${0}))"
 FFMPEG_BUILD_DIR="${ROOT_DIR}/ffmpeg_out"
-FFMPEG_ORIG="${ROOT_DIR}/ffmpeg-2.8.tar.xz"
 
 DEBFULLNAME="ContentArmor SAS"
 DEBEMAIL="support@contentarmor.net"
-PKG_VERS="1.0.2"
+PKG_VERS="1.1.0"
 CONTENT_ARMOR_HOME="/cafvm"
 FFMPEG_BUILD_LIB="./ffmpeg_out/lib"
 OUT_DEBS_DIR="./debs"
-FFMPEG_SRC_DELIVERY="./ca-ffmpeg-2.8_${PKG_VERS}"
+FFMPEG_SRC_DELIVERY="./ca-ffmpeg-3.2.4_${PKG_VERS}"
 
 function LOG
 {
@@ -40,13 +39,13 @@ if [ "$COMPILER" = "icpc" ];then
   CXX=icpc
   LD=icc
   AR=xiar
-  PKG_NAME="libffmpeg2.8i-ca"
+  PKG_NAME="libffmpeg3.2.4i-ca"
 else
   CC=gcc
   CXX=g++
   LD=g++
   AR=ar
-  PKG_NAME="libffmpeg2.8-ca"
+  PKG_NAME="libffmpeg3.2.4-ca"
 fi
 
 CONFIGURE_COMMAND="./configure --enable-shared --disable-doc --disable-programs --disable-static --prefix=${FFMPEG_BUILD_DIR} --cc=$CC --cxx=$CXX --ld=$LD --ar=$AR"
@@ -64,12 +63,12 @@ function clean_all
 {
     LOG "#### ${FUNCNAME} ###"
     clean "${FFMPEG_BUILD_DIR}"
-    clean "./ffmpeg-2.8"
+    clean "./ffmpeg-3.2.4"
     clean "./debian"
     clean "./debs"
     clean "${FFMPEG_SRC_DELIVERY}"
     clean "${FFMPEG_SRC_DELIVERY}.tgz"
-    rm -f rpmbuild/SPECS/libffmpeg2.8*-ca.spec
+    rm -f rpmbuild/SPECS/libffmpeg3.2.4*-ca.spec
     clean rpmbuild/RPMS/x86_64
     clean rpmbuild/SRPMS
     clean rpmbuild/SOURCES
@@ -79,11 +78,11 @@ function build_ffmpeg
 {
     LOG "#### ${FUNCNAME} ###"
 
-    if [ ! -d ffmpeg-2.8 ]; then
-        ln -s ../ ffmpeg-2.8
+    if [ ! -d ffmpeg-3.2.4 ]; then
+        ln -s ../ ffmpeg-3.2.4
     fi
 
-    cd  ffmpeg-2.8
+    cd  ffmpeg-3.2.4
     ASSERT_OK ${LINENO}
 
     LOG "============================================================"
@@ -192,7 +191,7 @@ function create_rpm_lib_delivery
     # Update the absolute prefix path in CONFIGURE_COMMAND before to add it in the list of substitution
     CONFIGURE_COMMAND=$(echo ${CONFIGURE_COMMAND} | sed "s#--prefix=.*ffmpeg_out#--prefix=${CONTENT_ARMOR_HOME}#")
     # Create the list of substitution
-    VARS=$(grep -oh '\#<[^>]\+>\#' rpmbuild/SPECS/${PKG_NAME}.spec ${RPM_BUILDROOT}/usr/share/doc/libffmpeg2.8-ca/* | sort -u | \sed 's/\#<\([^>]\+\)>\#.*/\1/')
+    VARS=$(grep -oh '\#<[^>]\+>\#' rpmbuild/SPECS/${PKG_NAME}.spec ${RPM_BUILDROOT}/usr/share/doc/libffmpeg3.2.4-ca/* | sort -u | \sed 's/\#<\([^>]\+\)>\#.*/\1/')
     VAR_SUBS="$(for var in ${VARS}; do eval "val=\$${var}"; echo -n "s%\#<${var}>\#%${val}%g;"; done)"
     for file in rpmbuild/SPECS/${PKG_NAME}.spec ${RPM_BUILDROOT}/usr/share/doc/*; do
         [ -f ${file} ] && sed -i "${VAR_SUBS}" ${file}
@@ -218,6 +217,11 @@ case "$1" in
         create_deb_lib_delivery
         ;;
     rpm)
+        if cat /etc/os-release | grep -qi ubuntu ; then
+            ERROR "Use rpm based system to create rpm package"
+            ASSERT_OK ${LINENO}
+        fi
+
         build_ffmpeg
         create_rpm_lib_delivery
         ;;

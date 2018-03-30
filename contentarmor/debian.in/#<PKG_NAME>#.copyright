@@ -1,5 +1,5 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: libffmpeg2.8
+Upstream-Name: libffmpeg3.2.4
 Upstream-Contact:
   #<DEBFULLNAME># <#<DEBEMAIL>#>
   ffmpeg-devel@ffmpeg.org
