@@ -1,0 +1,6 @@
+#<PKG_NAME># (#<PKG_VERS>#) unstable; urgency=low
+
+  * Add libswscale.s
+  * Initial Release.
+
+ -- ContentArmor SAS <support@contentarmor.net>  Tue, 15 Nov 2016 12:40:23 +0100

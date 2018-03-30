@@ -1,0 +1,6 @@
+# ffmpeg libs required by the fingerprint service
+#<FFMPEG_BUILD_LIB>#/libavcodec.so* #<CONTENT_ARMOR_HOME>#/lib/
+#<FFMPEG_BUILD_LIB>#/libavformat.so* #<CONTENT_ARMOR_HOME>#/lib/
+#<FFMPEG_BUILD_LIB>#/libavutil.so* #<CONTENT_ARMOR_HOME>#/lib/
+#<FFMPEG_BUILD_LIB>#/libswresample.so* #<CONTENT_ARMOR_HOME>#/lib/
+#<FFMPEG_BUILD_LIB>#/libswscale.so* #<CONTENT_ARMOR_HOME>#/lib/
