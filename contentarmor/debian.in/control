@@ -1,0 +1,16 @@
+Source: #<PKG_NAME>#
+Priority: optional
+Maintainer: ContentArmor SAS <support@contentarmor.net>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Section: libs
+Homepage: http://www.contentarmor.net
+#Vcs-Git: git://git.debian.org/collab-maint/#<PKG_NAME>#.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/#<PKG_NAME>#.git;a=summary
+
+Package: #<PKG_NAME>#
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: FFmpeg shared libraries generated compiled with #<COMPILER># from vanilla FFmpeg sources, without any modification from
+ ContentArmor SAS.
