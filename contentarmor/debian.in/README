@@ -1,0 +1,11 @@
+The Package #<PKG_NAME>#
+----------------------------
+
+The #<PKG_NAME># package install FFmpeg shared libraries generated from vanilla FFmpeg sources, without any modification from
+ ContentArmor SAS.
+
+The #<PKG_NAME># has been compiled with the following commands :
+    #<CONFIGURE_COMMAND>#
+    #<MAKE_COMMAND>#
+
+ -- ContentArmor SAS <support@contentarmor.net>
