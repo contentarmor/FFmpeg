@@ -9,7 +9,7 @@ FFMPEG_BUILD_DIR="${ROOT_DIR}/ffmpeg_out"
 
 DEBFULLNAME="ContentArmor SAS"
 DEBEMAIL="support@contentarmor.net"
-PKG_VERS="1.1.1"
+PKG_VERS="1.2.0"
 CONTENT_ARMOR_HOME="/cafvm"
 FFMPEG_BUILD_LIB="./ffmpeg_out/lib"
 OUT_DEBS_DIR="./debs"
@@ -200,7 +200,7 @@ function create_rpm_lib_delivery
     for file in rpmbuild/SPECS/${PKG_NAME}.spec ${RPM_BUILDROOT}/usr/share/doc/*; do
         [ -f ${file} ] && sed -i "${VAR_SUBS}" ${file}
     done
-    
+
     for file in ${RPM_BUILDROOT}/${CONTENT_ARMOR_HOME}/lib/pkgconfig/*; do
         [ -f ${file} ] && sed -i "s%${FFMPEG_BUILD_DIR}%${CONTENT_ARMOR_HOME}%g;" ${file}
     done
