@@ -9,7 +9,7 @@ FFMPEG_BUILD_DIR="${ROOT_DIR}/ffmpeg_out"
 
 DEBFULLNAME="ContentArmor SAS"
 DEBEMAIL="support@contentarmor.net"
-PKG_VERS="1.3.0"
+PKG_VERS="1.4.0"
 CONTENT_ARMOR_HOME="/cafvm"
 FFMPEG_BUILD_LIB="./ffmpeg_out/lib"
 OUT_DEBS_DIR="./debs"
