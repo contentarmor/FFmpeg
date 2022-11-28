@@ -45,6 +45,8 @@
 #include "thread.h"
 #include "videodsp.h"
 
+//#define HEVC_CHROMA_DECODE
+
 #define SHIFT_CTB_WPP 2
 
 #define MAX_TB_SIZE 32

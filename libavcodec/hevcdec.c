@@ -516,7 +516,11 @@ static int set_sps(HEVCContext *s, const HEVCSPS *sps,
     }
 
     if (sps->sao_enabled && !s->avctx->hwaccel) {
+#ifdef HEVC_CHROMA_DECODE
         int c_count = (sps->chroma_format_idc != 0) ? 3 : 1;
+#else
+        int c_count = (sps->separate_colour_plane_flag != 0) ? 3 : 1;
+#endif
         int c_idx;
 
         for(c_idx = 0; c_idx < c_count; c_idx++) {
@@ -1019,7 +1023,11 @@ static void hls_sao_param(HEVCContext *s, int rx, int ry)
         }
     }
 
-    for (c_idx = 0; c_idx < (s->ps.sps->chroma_format_idc ? 3 : 1); c_idx++) {
+//#ifdef HEVC_CHROMA_DECODE // disable flag for 4:2:2 support
+    for (c_idx = 0; c_idx < (s->ps.sps->chroma_format_idc ? 3 : 1); c_idx++) { 
+//#else
+//    for (c_idx = 0; c_idx < (s->ps.sps->separate_colour_plane_flag ? 3 : 1); c_idx++) { 
+//#endif
         int log2_sao_offset_scale = c_idx == 0 ? s->ps.pps->log2_sao_offset_scale_luma :
                                                  s->ps.pps->log2_sao_offset_scale_chroma;
 
@@ -1439,11 +1447,15 @@ static int hls_pcm_sample(HEVCContext *s, int x0, int y0, int log2_cb_size)
     GetBitContext gb;
     int cb_size   = 1 << log2_cb_size;
     ptrdiff_t stride0 = s->frame->linesize[0];
+#ifdef HEVC_CHROMA_DECODE
     ptrdiff_t stride1 = s->frame->linesize[1];
     ptrdiff_t stride2 = s->frame->linesize[2];
+#endif
     uint8_t *dst0 = &s->frame->data[0][y0 * stride0 + (x0 << s->ps.sps->pixel_shift)];
+#ifdef HEVC_CHROMA_DECODE
     uint8_t *dst1 = &s->frame->data[1][(y0 >> s->ps.sps->vshift[1]) * stride1 + ((x0 >> s->ps.sps->hshift[1]) << s->ps.sps->pixel_shift)];
     uint8_t *dst2 = &s->frame->data[2][(y0 >> s->ps.sps->vshift[2]) * stride2 + ((x0 >> s->ps.sps->hshift[2]) << s->ps.sps->pixel_shift)];
+#endif
 
     int length         = cb_size * cb_size * s->ps.sps->pcm.bit_depth +
                          (((cb_size >> s->ps.sps->hshift[1]) * (cb_size >> s->ps.sps->vshift[1])) +
@@ -1460,6 +1472,7 @@ static int hls_pcm_sample(HEVCContext *s, int x0, int y0, int log2_cb_size)
         return ret;
 
     s->hevcdsp.put_pcm(dst0, stride0, cb_size, cb_size,     &gb, s->ps.sps->pcm.bit_depth);
+#ifdef HEVC_CHROMA_DECODE
     if (s->ps.sps->chroma_format_idc) {
         s->hevcdsp.put_pcm(dst1, stride1,
                            cb_size >> s->ps.sps->hshift[1],
@@ -1470,6 +1483,7 @@ static int hls_pcm_sample(HEVCContext *s, int x0, int y0, int log2_cb_size)
                            cb_size >> s->ps.sps->vshift[2],
                            &gb, s->ps.sps->pcm.bit_depth_chroma);
     }
+#endif
 
     return 0;
 }
@@ -1641,7 +1655,7 @@ static void luma_mc_uni(HEVCContext *s, uint8_t *dst, ptrdiff_t dststride,
  * @param chroma_weight weighting factor applied to the chroma prediction
  * @param chroma_offset additive offset applied to the chroma prediction value
  */
-
+#ifdef HEVC_CHROMA_DECODE
 static void chroma_mc_uni(HEVCContext *s, uint8_t *dst0,
                           ptrdiff_t dststride, uint8_t *src0, ptrdiff_t srcstride, int reflist,
                           int x_off, int y_off, int block_w, int block_h, struct MvField *current_mv, int chroma_weight, int chroma_offset)
@@ -1689,6 +1703,7 @@ static void chroma_mc_uni(HEVCContext *s, uint8_t *dst0,
                                                         block_h, s->sh.chroma_log2_weight_denom,
                                                         chroma_weight, chroma_offset, _mx, _my, block_w);
 }
+#endif
 
 /**
  * 8.5.3.2.2.2 Chroma sample bidirectional interpolation process
@@ -1707,6 +1722,7 @@ static void chroma_mc_uni(HEVCContext *s, uint8_t *dst0,
  * @param current_mv current motion vector structure
  * @param cidx chroma component(cb, cr)
  */
+#ifdef HEVC_CHROMA_DECODE
 static void chroma_mc_bi(HEVCContext *s, uint8_t *dst0, ptrdiff_t dststride, AVFrame *ref0, AVFrame *ref1,
                          int x_off, int y_off, int block_w, int block_h, struct MvField *current_mv, int cidx)
 {
@@ -1796,6 +1812,7 @@ static void chroma_mc_bi(HEVCContext *s, uint8_t *dst0, ptrdiff_t dststride, AVF
                                                          s->sh.chroma_offset_l1[current_mv->ref_idx[1]][cidx],
                                                          _mx1, _my1, block_w);
 }
+#endif
 
 static void hevc_await_progress(HEVCContext *s, HEVCFrame *ref,
                                 const Mv *mv, int y0, int height)
@@ -1869,8 +1886,10 @@ static void hls_prediction_unit(HEVCContext *s, int x0, int y0,
     RefPicList  *refPicList = s->ref->refPicList;
     HEVCFrame *ref0 = NULL, *ref1 = NULL;
     uint8_t *dst0 = POS(0, x0, y0);
+#ifdef HEVC_CHROMA_DECODE
     uint8_t *dst1 = POS(1, x0, y0);
     uint8_t *dst2 = POS(2, x0, y0);
+#endif
     int log2_min_cb_size = s->ps.sps->log2_min_cb_size;
     int min_cb_width     = s->ps.sps->min_cb_width;
     int x_cb             = x0 >> log2_min_cb_size;
@@ -1917,16 +1936,19 @@ static void hls_prediction_unit(HEVCContext *s, int x0, int y0,
     }
 
     if (current_mv.pred_flag == PF_L0) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> s->ps.sps->hshift[1];
         int y0_c = y0 >> s->ps.sps->vshift[1];
         int nPbW_c = nPbW >> s->ps.sps->hshift[1];
         int nPbH_c = nPbH >> s->ps.sps->vshift[1];
+#endif
 
         luma_mc_uni(s, dst0, s->frame->linesize[0], ref0->frame,
                     &current_mv.mv[0], x0, y0, nPbW, nPbH,
                     s->sh.luma_weight_l0[current_mv.ref_idx[0]],
                     s->sh.luma_offset_l0[current_mv.ref_idx[0]]);
 
+#ifdef HEVC_CHROMA_DECODE
         if (s->ps.sps->chroma_format_idc) {
             chroma_mc_uni(s, dst1, s->frame->linesize[1], ref0->frame->data[1], ref0->frame->linesize[1],
                           0, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
@@ -1935,17 +1957,21 @@ static void hls_prediction_unit(HEVCContext *s, int x0, int y0,
                           0, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
                           s->sh.chroma_weight_l0[current_mv.ref_idx[0]][1], s->sh.chroma_offset_l0[current_mv.ref_idx[0]][1]);
         }
+#endif
     } else if (current_mv.pred_flag == PF_L1) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> s->ps.sps->hshift[1];
         int y0_c = y0 >> s->ps.sps->vshift[1];
         int nPbW_c = nPbW >> s->ps.sps->hshift[1];
         int nPbH_c = nPbH >> s->ps.sps->vshift[1];
+#endif
 
         luma_mc_uni(s, dst0, s->frame->linesize[0], ref1->frame,
                     &current_mv.mv[1], x0, y0, nPbW, nPbH,
                     s->sh.luma_weight_l1[current_mv.ref_idx[1]],
                     s->sh.luma_offset_l1[current_mv.ref_idx[1]]);
 
+#ifdef HEVC_CHROMA_DECODE
         if (s->ps.sps->chroma_format_idc) {
             chroma_mc_uni(s, dst1, s->frame->linesize[1], ref1->frame->data[1], ref1->frame->linesize[1],
                           1, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
@@ -1955,16 +1981,20 @@ static void hls_prediction_unit(HEVCContext *s, int x0, int y0,
                           1, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
                           s->sh.chroma_weight_l1[current_mv.ref_idx[1]][1], s->sh.chroma_offset_l1[current_mv.ref_idx[1]][1]);
         }
+#endif
     } else if (current_mv.pred_flag == PF_BI) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> s->ps.sps->hshift[1];
         int y0_c = y0 >> s->ps.sps->vshift[1];
         int nPbW_c = nPbW >> s->ps.sps->hshift[1];
         int nPbH_c = nPbH >> s->ps.sps->vshift[1];
+#endif
 
         luma_mc_bi(s, dst0, s->frame->linesize[0], ref0->frame,
                    &current_mv.mv[0], x0, y0, nPbW, nPbH,
                    ref1->frame, &current_mv.mv[1], &current_mv);
 
+#ifdef HEVC_CHROMA_DECODE
         if (s->ps.sps->chroma_format_idc) {
             chroma_mc_bi(s, dst1, s->frame->linesize[1], ref0->frame, ref1->frame,
                          x0_c, y0_c, nPbW_c, nPbH_c, &current_mv, 0);
@@ -1972,6 +2002,7 @@ static void hls_prediction_unit(HEVCContext *s, int x0, int y0,
             chroma_mc_bi(s, dst2, s->frame->linesize[2], ref0->frame, ref1->frame,
                          x0_c, y0_c, nPbW_c, nPbH_c, &current_mv, 1);
         }
+#endif
     }
 }
 
@@ -2080,11 +2111,11 @@ static void intra_prediction_unit(HEVCContext *s, int x0, int y0,
 {
     HEVCLocalContext *lc = s->HEVClc;
     static const uint8_t intra_chroma_table[4] = { 0, 26, 10, 1 };
+    int chroma_mode;
     uint8_t prev_intra_luma_pred_flag[4];
     int split   = lc->cu.part_mode == PART_NxN;
     int pb_size = (1 << log2_cb_size) >> split;
     int side    = split + 1;
-    int chroma_mode;
     int i, j;
 
     for (i = 0; i < side; i++)
