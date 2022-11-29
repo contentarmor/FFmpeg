@@ -31,3 +31,13 @@ Development files for FFmpeg shared libraries build by ContentArmor SAS.
 %files dev
 #<CONTENT_ARMOR_HOME>#/include/*
 #<CONTENT_ARMOR_HOME>#/lib/pkgconfig/*
+
+%package bin
+Summary:        FFmpeg applications build by ContentArmor SAS.
+
+%description bin
+FFmpeg applications build by ContentArmor SAS.
+
+%files bin
+#<CONTENT_ARMOR_HOME>#/bin/*
+

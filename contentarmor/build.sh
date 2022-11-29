@@ -49,7 +49,11 @@ else
   PKG_NAME="libffmpeg${FFMPEG_VERSION}-ca"
 fi
 
+if [ "$1" = "rpm" ]; then
+CONFIGURE_COMMAND="./configure --enable-shared --disable-doc --disable-static --prefix=${FFMPEG_BUILD_DIR} --cc=$CC --cxx=$CXX --ld=$LD --ar=$AR"
+else
 CONFIGURE_COMMAND="./configure --enable-shared --disable-doc --disable-programs --disable-static --prefix=${FFMPEG_BUILD_DIR} --cc=$CC --cxx=$CXX --ld=$LD --ar=$AR"
+fi
 MAKE_COMMAND="make -j16"
 
 function clean
