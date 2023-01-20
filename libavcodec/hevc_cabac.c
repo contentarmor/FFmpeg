@@ -1484,6 +1484,13 @@ void ff_hevc_hls_residual_coding(HEVCContext *s, int x0, int y0,
         }
     }
 
+#ifndef HEVC_CHROMA_DECODE
+    if( c_idx != 0 )
+    {
+        return;
+    }
+#endif
+
     if (lc->cu.cu_transquant_bypass_flag) {
         if (explicit_rdpcm_flag || (s->ps.sps->implicit_rdpcm_enabled_flag &&
                                     (pred_mode_intra == 10 || pred_mode_intra == 26))) {
