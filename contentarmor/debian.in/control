@@ -1,0 +1,13 @@
+Source: #<PKG_NAME>#
+Priority: optional
+Maintainer: Synamedia ContentArmor Watermarking <stf-support@synamedia.com>
+Standards-Version: 4.7.0
+Section: libs
+Homepage: https://www.synamedia.com/product/contentarmor-watermarking/
+Vcs-Browser: https://github.com/contentarmor/FFmpeg
+
+Package: #<PKG_NAME>#
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: FFmpeg shared libraries compiled with #<COMPILER># from vanilla FFmpeg sources.
