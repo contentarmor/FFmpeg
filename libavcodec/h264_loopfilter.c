@@ -241,9 +241,11 @@ static av_always_inline void h264_filter_mb_fast_internal(const H264Context *h,
                                                           unsigned int uvlinesize,
                                                           int pixel_shift)
 {
+#ifdef H264_DECODE_CHROMA
     int chroma = CHROMA(h) && !(CONFIG_GRAY && (h->flags & AV_CODEC_FLAG_GRAY));
-    int chroma444 = CHROMA444(h);
     int chroma422 = CHROMA422(h);
+#endif
+    int chroma444 = CHROMA444(h);
 
     int mb_xy = sl->mb_xy;
     int left_type = sl->left_type[LTOP];
@@ -288,6 +290,7 @@ static av_always_inline void h264_filter_mb_fast_internal(const H264Context *h,
             filter_mb_edgeh( &img_y[4*2*linesize], linesize, bS3, qp, a, b, h, 0);
             filter_mb_edgeh( &img_y[4*3*linesize], linesize, bS3, qp, a, b, h, 0);
         }
+#ifdef H264_DECODE_CHROMA
         if(chroma){
             if(chroma444){
                 if(left_type){
@@ -353,6 +356,7 @@ static av_always_inline void h264_filter_mb_fast_internal(const H264Context *h,
                 filter_mb_edgech( &img_cr[2*2*uvlinesize], uvlinesize, bS3, qpc, a, b, h, 0);
             }
         }
+#endif
         return;
     } else {
         LOCAL_ALIGNED(8, int16_t, bS, [2], [4][4]);
@@ -376,6 +380,7 @@ static av_always_inline void h264_filter_mb_fast_internal(const H264Context *h,
         if( IS_INTRA(top_type) )
             AV_WN64A(bS[1][0], FIELD_PICTURE(h) ? 0x0003000300030003ULL : 0x0004000400040004ULL);
 
+#ifdef H264_DECODE_CHROMA
 #define FILTER(hv,dir,edge,intra)\
         if(AV_RN64A(bS[dir][edge])) {                                   \
             filter_mb_edge##hv( &img_y[4*edge*(dir?linesize:1<<pixel_shift)], linesize, bS[dir][edge], edge ? qp : qp##dir, a, b, h, intra );\
@@ -389,6 +394,12 @@ static av_always_inline void h264_filter_mb_fast_internal(const H264Context *h,
                 }\
             }\
         }
+#else
+#define FILTER(hv,dir,edge,intra)\
+        if(AV_RN64A(bS[dir][edge])) {                                   \
+            filter_mb_edge##hv( &img_y[4*edge*(dir?linesize:1<<pixel_shift)], linesize, bS[dir][edge], edge ? qp : qp##dir, a, b, h, intra );\
+        }
+#endif
         if(left_type)
             FILTER(v,0,0,1);
         if( edges == 1 ) {
@@ -467,15 +478,23 @@ static int check_mv(H264SliceContext *sl, long b_idx, long bn_idx, int mvy_limit
 
 static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContext *sl,
                                            int mb_x, int mb_y,
-                                           uint8_t *img_y, uint8_t *img_cb, uint8_t *img_cr,
+                                           uint8_t *img_y,
+#ifdef H264_DECODE_CHROMA
+                                           uint8_t *img_cb, uint8_t *img_cr,
+#endif
                                            unsigned int linesize, unsigned int uvlinesize,
                                            int mb_xy, int mb_type, int mvy_limit,
                                            int first_vertical_edge_done, int a, int b,
-                                           int chroma, int dir)
+#ifdef H264_DECODE_CHROMA
+                                           int chroma,
+#endif
+                                           int dir)
 {
     int edge;
+#ifdef H264_DECODE_CHROMA
     int chroma_qp_avg[2];
     int chroma444 = CHROMA444(h);
+#endif
     int chroma422 = CHROMA422(h);
     const int mbm_xy = dir == 0 ? mb_xy -1 : sl->top_mb_xy;
     const int mbm_type = dir == 0 ? sl->left_type[LTOP] : sl->top_type;
@@ -499,7 +518,9 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
             // frame macroblock.
             //
             unsigned int tmp_linesize   = 2 *   linesize;
+#ifdef H264_DECODE_CHROMA
             unsigned int tmp_uvlinesize = 2 * uvlinesize;
+#endif
             int mbn_xy = mb_xy - 2 * h->mb_stride;
             int j;
 
@@ -528,6 +549,7 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                 ff_tlog(h->avctx, "filter mb:%d/%d dir:%d, QPy:%d ls:%d uvls:%d", mb_x, mb_y, dir, qp, tmp_linesize, tmp_uvlinesize);
                 { int i; for (i = 0; i < 4; i++) ff_tlog(h->avctx, " bS[%d]:%d", i, bS[i]); ff_tlog(h->avctx, "\n"); }
                 filter_mb_edgeh( &img_y[j*linesize], tmp_linesize, bS, qp, a, b, h, 0 );
+#ifdef H264_DECODE_CHROMA
                 chroma_qp_avg[0] = (sl->chroma_qp[0] + get_chroma_qp(h->ps.pps, 0, h->cur_pic.qscale_table[mbn_xy]) + 1) >> 1;
                 chroma_qp_avg[1] = (sl->chroma_qp[1] + get_chroma_qp(h->ps.pps, 1, h->cur_pic.qscale_table[mbn_xy]) + 1) >> 1;
                 if (chroma) {
@@ -539,6 +561,7 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                         filter_mb_edgech(&img_cr[j*uvlinesize], tmp_uvlinesize, bS, chroma_qp_avg[1], a, b, h, 0);
                     }
                 }
+#endif
             }
         }else{
             LOCAL_ALIGNED(8, int16_t, bS, [4]);
@@ -593,10 +616,13 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                 //ff_tlog(h->avctx, "filter mb:%d/%d dir:%d edge:%d, QPy:%d, QPc:%d, QPcn:%d\n", mb_x, mb_y, dir, edge, qp, h->chroma_qp[0], h->cur_pic.qscale_table[mbn_xy]);
                 ff_tlog(h->avctx, "filter mb:%d/%d dir:%d edge:%d, QPy:%d ls:%d uvls:%d", mb_x, mb_y, dir, edge, qp, linesize, uvlinesize);
                 //{ int i; for (i = 0; i < 4; i++) ff_tlog(h->avctx, " bS[%d]:%d", i, bS[i]); ff_tlog(h->avctx, "\n"); }
+#ifdef H264_DECODE_CHROMA
                 chroma_qp_avg[0] = (sl->chroma_qp[0] + get_chroma_qp(h->ps.pps, 0, h->cur_pic.qscale_table[mbm_xy]) + 1) >> 1;
                 chroma_qp_avg[1] = (sl->chroma_qp[1] + get_chroma_qp(h->ps.pps, 1, h->cur_pic.qscale_table[mbm_xy]) + 1) >> 1;
+#endif
                 if( dir == 0 ) {
                     filter_mb_edgev( &img_y[0], linesize, bS, qp, a, b, h, 1 );
+#ifdef H264_DECODE_CHROMA
                     if (chroma) {
                         if (chroma444) {
                             filter_mb_edgev ( &img_cb[0], uvlinesize, bS, chroma_qp_avg[0], a, b, h, 1);
@@ -606,8 +632,10 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                             filter_mb_edgecv( &img_cr[0], uvlinesize, bS, chroma_qp_avg[1], a, b, h, 1);
                         }
                     }
+#endif
                 } else {
                     filter_mb_edgeh( &img_y[0], linesize, bS, qp, a, b, h, 1 );
+#ifdef H264_DECODE_CHROMA
                     if (chroma) {
                         if (chroma444) {
                             filter_mb_edgeh ( &img_cb[0], uvlinesize, bS, chroma_qp_avg[0], a, b, h, 1);
@@ -617,6 +645,7 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                             filter_mb_edgech( &img_cr[0], uvlinesize, bS, chroma_qp_avg[1], a, b, h, 1);
                         }
                     }
+#endif
                 }
             }
         }
@@ -680,6 +709,7 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
         //{ int i; for (i = 0; i < 4; i++) ff_tlog(h->avctx, " bS[%d]:%d", i, bS[i]); ff_tlog(h->avctx, "\n"); }
         if( dir == 0 ) {
             filter_mb_edgev( &img_y[4*edge << h->pixel_shift], linesize, bS, qp, a, b, h, 0 );
+#ifdef H264_DECODE_CHROMA
             if (chroma) {
                 if (chroma444) {
                     filter_mb_edgev ( &img_cb[4*edge << h->pixel_shift], uvlinesize, bS, sl->chroma_qp[0], a, b, h, 0);
@@ -689,16 +719,20 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                     filter_mb_edgecv( &img_cr[2*edge << h->pixel_shift], uvlinesize, bS, sl->chroma_qp[1], a, b, h, 0);
                 }
             }
+#endif
         } else {
             if (chroma422) {
                 if (deblock_edge)
                     filter_mb_edgeh(&img_y[4*edge*linesize], linesize, bS, qp, a, b, h, 0);
+#ifdef H264_DECODE_CHROMA
                 if (chroma) {
                     filter_mb_edgech(&img_cb[4*edge*uvlinesize], uvlinesize, bS, sl->chroma_qp[0], a, b, h, 0);
                     filter_mb_edgech(&img_cr[4*edge*uvlinesize], uvlinesize, bS, sl->chroma_qp[1], a, b, h, 0);
                 }
+#endif
             } else {
                 filter_mb_edgeh(&img_y[4*edge*linesize], linesize, bS, qp, a, b, h, 0);
+#ifdef H264_DECODE_CHROMA
                 if (chroma) {
                     if (chroma444) {
                         filter_mb_edgeh (&img_cb[4*edge*uvlinesize], uvlinesize, bS, sl->chroma_qp[0], a, b, h, 0);
@@ -708,6 +742,7 @@ static av_always_inline void filter_mb_dir(const H264Context *h, H264SliceContex
                         filter_mb_edgech(&img_cr[2*edge*uvlinesize], uvlinesize, bS, sl->chroma_qp[1], a, b, h, 0);
                     }
                 }
+#endif
             }
         }
     }
@@ -722,7 +757,9 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
     const int mb_type = h->cur_pic.mb_type[mb_xy];
     const int mvy_limit = IS_INTERLACED(mb_type) ? 2 : 4;
     int first_vertical_edge_done = 0;
+#ifdef H264_DECODE_CHROMA
     int chroma = CHROMA(h) && !(CONFIG_GRAY && (h->flags & AV_CODEC_FLAG_GRAY));
+#endif
     int qp_bd_offset = 6 * (h->ps.sps->bit_depth_luma - 8);
     int a = 52 + sl->slice_alpha_c0_offset - qp_bd_offset;
     int b = 52 + sl->slice_beta_offset - qp_bd_offset;
@@ -737,8 +774,10 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
          */
         LOCAL_ALIGNED(8, int16_t, bS, [8]);
         int qp[2];
+#ifdef H264_DECODE_CHROMA
         int bqp[2];
         int rqp[2];
+#endif
         int mb_qp, mbn0_qp, mbn1_qp;
         int i;
         first_vertical_edge_done = 1;
@@ -778,15 +817,19 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
         mbn0_qp = h->cur_pic.qscale_table[sl->left_mb_xy[0]];
         mbn1_qp = h->cur_pic.qscale_table[sl->left_mb_xy[1]];
         qp[0] = ( mb_qp + mbn0_qp + 1 ) >> 1;
+#ifdef H264_DECODE_CHROMA
         bqp[0] = (get_chroma_qp(h->ps.pps, 0, mb_qp) +
                   get_chroma_qp(h->ps.pps, 0, mbn0_qp) + 1) >> 1;
         rqp[0] = (get_chroma_qp(h->ps.pps, 1, mb_qp) +
                   get_chroma_qp(h->ps.pps, 1, mbn0_qp) + 1) >> 1;
+#endif
         qp[1] = ( mb_qp + mbn1_qp + 1 ) >> 1;
+#ifdef H264_DECODE_CHROMA
         bqp[1] = (get_chroma_qp(h->ps.pps, 0, mb_qp) +
                   get_chroma_qp(h->ps.pps, 0, mbn1_qp) + 1 ) >> 1;
         rqp[1] = (get_chroma_qp(h->ps.pps, 1, mb_qp) +
                   get_chroma_qp(h->ps.pps, 1, mbn1_qp) + 1 ) >> 1;
+#endif
 
         /* Filter edge */
         ff_tlog(h->avctx, "filter mb:%d/%d MBAFF, QPy:%d/%d, QPb:%d/%d QPr:%d/%d ls:%d uvls:%d", mb_x, mb_y, qp[0], qp[1], bqp[0], bqp[1], rqp[0], rqp[1], linesize, uvlinesize);
@@ -794,6 +837,7 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
         if (MB_FIELD(sl)) {
             filter_mb_mbaff_edgev ( h, img_y                ,   linesize, bS  , 1, qp [0], a, b, 1 );
             filter_mb_mbaff_edgev ( h, img_y  + 8*  linesize,   linesize, bS+4, 1, qp [1], a, b, 1 );
+#ifdef H264_DECODE_CHROMA
             if (chroma){
                 if (CHROMA444(h)) {
                     filter_mb_mbaff_edgev ( h, img_cb,                uvlinesize, bS  , 1, bqp[0], a, b, 1 );
@@ -812,9 +856,11 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
                     filter_mb_mbaff_edgecv( h, img_cr + 4*uvlinesize, uvlinesize, bS+4, 1, rqp[1], a, b, 1 );
                 }
             }
+#endif
         }else{
             filter_mb_mbaff_edgev ( h, img_y              , 2*  linesize, bS  , 2, qp [0], a, b, 1 );
             filter_mb_mbaff_edgev ( h, img_y  +   linesize, 2*  linesize, bS+1, 2, qp [1], a, b, 1 );
+#ifdef H264_DECODE_CHROMA
             if (chroma){
                 if (CHROMA444(h)) {
                     filter_mb_mbaff_edgev ( h, img_cb,              2*uvlinesize, bS  , 2, bqp[0], a, b, 1 );
@@ -828,6 +874,7 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
                     filter_mb_mbaff_edgecv( h, img_cr + uvlinesize, 2*uvlinesize, bS+1, 2, rqp[1], a, b, 1 );
                 }
             }
+#endif
         }
     }
 
@@ -835,13 +882,36 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl,
     {
         int dir;
         for (dir = 0; dir < 2; dir++)
-            filter_mb_dir(h, sl, mb_x, mb_y, img_y, img_cb, img_cr, linesize,
+            filter_mb_dir(h, sl, mb_x, mb_y, img_y,
+#ifdef H264_DECODE_CHROMA
+                          img_cb, img_cr,
+#endif
+                          linesize,
                           uvlinesize, mb_xy, mb_type, mvy_limit,
                           dir ? 0 : first_vertical_edge_done, a, b,
-                          chroma, dir);
+#ifdef H264_DECODE_CHROMA
+                          chroma,
+#endif
+                          dir);
     }
 #else
-    filter_mb_dir(h, sl, mb_x, mb_y, img_y, img_cb, img_cr, linesize, uvlinesize, mb_xy, mb_type, mvy_limit, first_vertical_edge_done, a, b, chroma, 0);
-    filter_mb_dir(h, sl, mb_x, mb_y, img_y, img_cb, img_cr, linesize, uvlinesize, mb_xy, mb_type, mvy_limit, 0,                        a, b, chroma, 1);
+    filter_mb_dir(h, sl, mb_x, mb_y, img_y,
+#ifdef H264_DECODE_CHROMA
+                  img_cb, img_cr,
+#endif
+                  linesize, uvlinesize, mb_xy, mb_type, mvy_limit, first_vertical_edge_done, a, b,
+#ifdef H264_DECODE_CHROMA
+                  chroma,
+#endif
+                  0);
+    filter_mb_dir(h, sl, mb_x, mb_y, img_y,
+#ifdef H264_DECODE_CHROMA
+                  img_cb, img_cr,
+#endif
+                  linesize, uvlinesize, mb_xy, mb_type, mvy_limit, 0, a, b,
+#ifdef H264_DECODE_CHROMA
+                  chroma,
+#endif
+                  1);
 #endif
 }

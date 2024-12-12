@@ -44,6 +44,7 @@ static const uint8_t betatable[52] = {
     38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64                      // QP 38...51
 };
 
+#ifdef HEVC_CHROMA_DECODE
 static int chroma_tc(const HEVCPPS *pps, const HEVCSPS *sps,
                      int qp_y, int c_idx, int tc_offset)
 {
@@ -73,6 +74,7 @@ static int chroma_tc(const HEVCPPS *pps, const HEVCSPS *sps,
     idxt = av_clip(qp + DEFAULT_INTRA_TC_OFFSET + tc_offset, 0, 53);
     return tctable[idxt];
 }
+#endif
 
 static int get_qPy_pred(HEVCLocalContext *lc, const HEVCContext *s,
                         const HEVCLayerContext *l,
@@ -328,7 +330,12 @@ static void sao_filter_CTB(HEVCLocalContext *lc, const HEVCLayerContext *l,
         }
     }
 
+#ifdef HEVC_CHROMA_DECODE
     for (c_idx = 0; c_idx < (sps->chroma_format_idc ? 3 : 1); c_idx++) {
+#else
+    c_idx = 0;
+    {
+#endif
         int x0       = x >> sps->hshift[c_idx];
         int y0       = y >> sps->vshift[c_idx];
         ptrdiff_t stride_src = s->cur_frame->f->linesize[c_idx];
@@ -507,8 +514,12 @@ static void deblocking_filter_CTB(const HEVCContext *s, const HEVCLayerContext *
 
     uint8_t *src;
     int x, y;
-    int chroma, beta;
-    int32_t c_tc[2], tc[2];
+#ifdef HEVC_CHROMA_DECODE
+    int chroma;
+    int32_t c_tc[2];
+#endif
+    int beta;
+    int32_t tc[2];
     uint8_t no_p[2] = { 0 };
     uint8_t no_q[2] = { 0 };
 
@@ -605,6 +616,7 @@ static void deblocking_filter_CTB(const HEVCContext *s, const HEVCLayerContext *
         }
     }
 
+#ifdef HEVC_CHROMA_DECODE
     if (sps->chroma_format_idc) {
         for (chroma = 1; chroma <= 2; chroma++) {
             int h = 1 << sps->hshift[chroma];
@@ -673,6 +685,7 @@ static void deblocking_filter_CTB(const HEVCContext *s, const HEVCLayerContext *
             }
         }
     }
+#endif
 }
 
 static int boundary_strength(const HEVCContext *s, const MvField *curr, const MvField *neigh,

@@ -1436,6 +1436,13 @@ void ff_hevc_hls_residual_coding(HEVCLocalContext *lc, const HEVCPPS *pps,
         }
     }
 
+#ifndef HEVC_CHROMA_DECODE
+    if( c_idx != 0 )
+    {
+        return;
+    }
+#endif
+
     if (lc->cu.cu_transquant_bypass_flag) {
         if (explicit_rdpcm_flag || (sps->implicit_rdpcm_enabled &&
                                     (pred_mode_intra == 10 || pred_mode_intra == 26))) {
@@ -1512,4 +1519,3 @@ void ff_hevc_hls_mvd_coding(HEVCLocalContext *lc, int x0, int y0, int log2_cb_si
     case 0: lc->pu.mvd.y = 0;                       break;
     }
 }
-

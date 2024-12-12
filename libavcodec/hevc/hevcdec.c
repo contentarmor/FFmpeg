@@ -144,7 +144,11 @@ static int pic_arrays_init(HEVCLayerContext *l, const HEVCSPS *sps)
         goto fail;
 
     if (sps->sao_enabled) {
+#ifdef HEVC_CHROMA_DECODE
         int c_count = (sps->chroma_format_idc != 0) ? 3 : 1;
+#else
+        int c_count = 1;
+#endif
 
         for (int c_idx = 0; c_idx < c_count; c_idx++) {
             int w = sps->width >> sps->hshift[c_idx];
@@ -1322,8 +1326,10 @@ static int hls_transform_unit(HEVCLocalContext *lc,
         if (cbf_luma)
             ff_hevc_hls_residual_coding(lc, pps, x0, y0, log2_trafo_size, scan_idx, 0);
         if (sps->chroma_format_idc && (log2_trafo_size > 2 || sps->chroma_format_idc == 3)) {
+#ifdef HEVC_CHROMA_DECODE
             int trafo_size_h = 1 << (log2_trafo_size_c + sps->hshift[1]);
             int trafo_size_v = 1 << (log2_trafo_size_c + sps->vshift[1]);
+#endif
             lc->tu.cross_pf  = (pps->cross_component_prediction_enabled_flag && cbf_luma &&
                                 (lc->cu.pred_mode == MODE_INTER ||
                                  (lc->tu.chroma_mode_c ==  4)));
@@ -1332,11 +1338,13 @@ static int hls_transform_unit(HEVCLocalContext *lc,
                 hls_cross_component_pred(lc, 0);
             }
             for (i = 0; i < (sps->chroma_format_idc == 2 ? 2 : 1); i++) {
+#ifdef HEVC_CHROMA_DECODE
                 if (lc->cu.pred_mode == MODE_INTRA) {
                     ff_hevc_set_neighbour_available(lc, x0, y0 + (i << log2_trafo_size_c),
                                                     trafo_size_h, trafo_size_v, sps->log2_ctb_size);
                     s->hpc.intra_pred[log2_trafo_size_c - 2](lc, pps, x0, y0 + (i << log2_trafo_size_c), 1);
                 }
+#endif
                 if (cbf_cb[i])
                     ff_hevc_hls_residual_coding(lc, pps, x0, y0 + (i << log2_trafo_size_c),
                                                 log2_trafo_size_c, scan_idx_c, 1);
@@ -1362,11 +1370,13 @@ static int hls_transform_unit(HEVCLocalContext *lc,
                 hls_cross_component_pred(lc, 1);
             }
             for (i = 0; i < (sps->chroma_format_idc == 2 ? 2 : 1); i++) {
+#ifdef HEVC_CHROMA_DECODE
                 if (lc->cu.pred_mode == MODE_INTRA) {
                     ff_hevc_set_neighbour_available(lc, x0, y0 + (i << log2_trafo_size_c),
                                                     trafo_size_h, trafo_size_v, sps->log2_ctb_size);
                     s->hpc.intra_pred[log2_trafo_size_c - 2](lc, pps, x0, y0 + (i << log2_trafo_size_c), 2);
                 }
+#endif
                 if (cbf_cr[i])
                     ff_hevc_hls_residual_coding(lc, pps, x0, y0 + (i << log2_trafo_size_c),
                                                 log2_trafo_size_c, scan_idx_c, 2);
@@ -1388,29 +1398,36 @@ static int hls_transform_unit(HEVCLocalContext *lc,
                     }
             }
         } else if (sps->chroma_format_idc && blk_idx == 3) {
+#ifdef HEVC_CHROMA_DECODE
             int trafo_size_h = 1 << (log2_trafo_size + 1);
             int trafo_size_v = 1 << (log2_trafo_size + sps->vshift[1]);
+#endif
             for (i = 0; i < (sps->chroma_format_idc == 2 ? 2 : 1); i++) {
+#ifdef HEVC_CHROMA_DECODE
                 if (lc->cu.pred_mode == MODE_INTRA) {
                     ff_hevc_set_neighbour_available(lc, xBase, yBase + (i << log2_trafo_size),
                                                     trafo_size_h, trafo_size_v, sps->log2_ctb_size);
                     s->hpc.intra_pred[log2_trafo_size - 2](lc, pps, xBase, yBase + (i << log2_trafo_size), 1);
                 }
+#endif
                 if (cbf_cb[i])
                     ff_hevc_hls_residual_coding(lc, pps, xBase, yBase + (i << log2_trafo_size),
                                                 log2_trafo_size, scan_idx_c, 1);
             }
             for (i = 0; i < (sps->chroma_format_idc == 2 ? 2 : 1); i++) {
+#ifdef HEVC_CHROMA_DECODE
                 if (lc->cu.pred_mode == MODE_INTRA) {
                     ff_hevc_set_neighbour_available(lc, xBase, yBase + (i << log2_trafo_size),
                                                 trafo_size_h, trafo_size_v, sps->log2_ctb_size);
                     s->hpc.intra_pred[log2_trafo_size - 2](lc, pps, xBase, yBase + (i << log2_trafo_size), 2);
                 }
+#endif
                 if (cbf_cr[i])
                     ff_hevc_hls_residual_coding(lc, pps, xBase, yBase + (i << log2_trafo_size),
                                                 log2_trafo_size, scan_idx_c, 2);
             }
         }
+#ifdef HEVC_CHROMA_DECODE
     } else if (sps->chroma_format_idc && lc->cu.pred_mode == MODE_INTRA) {
         if (log2_trafo_size > 2 || sps->chroma_format_idc == 3) {
             int trafo_size_h = 1 << (log2_trafo_size_c + sps->hshift[1]);
@@ -1439,6 +1456,7 @@ static int hls_transform_unit(HEVCLocalContext *lc,
                 s->hpc.intra_pred[log2_trafo_size - 2](lc, pps, xBase, yBase + (1 << log2_trafo_size), 2);
             }
         }
+#endif
     }
 
     return 0;
@@ -1596,11 +1614,15 @@ static int hls_pcm_sample(HEVCLocalContext *lc, const HEVCLayerContext *l,
     GetBitContext gb;
     int cb_size   = 1 << log2_cb_size;
     ptrdiff_t stride0 = s->cur_frame->f->linesize[0];
+#ifdef HEVC_CHROMA_DECODE
     ptrdiff_t stride1 = s->cur_frame->f->linesize[1];
     ptrdiff_t stride2 = s->cur_frame->f->linesize[2];
+#endif
     uint8_t *dst0 = &s->cur_frame->f->data[0][y0 * stride0 + (x0 << sps->pixel_shift)];
+#ifdef HEVC_CHROMA_DECODE
     uint8_t *dst1 = &s->cur_frame->f->data[1][(y0 >> sps->vshift[1]) * stride1 + ((x0 >> sps->hshift[1]) << sps->pixel_shift)];
     uint8_t *dst2 = &s->cur_frame->f->data[2][(y0 >> sps->vshift[2]) * stride2 + ((x0 >> sps->hshift[2]) << sps->pixel_shift)];
+#endif
 
     int length         = cb_size * cb_size * sps->pcm.bit_depth +
                          (((cb_size >> sps->hshift[1]) * (cb_size >> sps->vshift[1])) +
@@ -1617,6 +1639,7 @@ static int hls_pcm_sample(HEVCLocalContext *lc, const HEVCLayerContext *l,
         return ret;
 
     s->hevcdsp.put_pcm(dst0, stride0, cb_size, cb_size,     &gb, sps->pcm.bit_depth);
+#ifdef HEVC_CHROMA_DECODE
     if (sps->chroma_format_idc) {
         s->hevcdsp.put_pcm(dst1, stride1,
                            cb_size >> sps->hshift[1],
@@ -1627,6 +1650,7 @@ static int hls_pcm_sample(HEVCLocalContext *lc, const HEVCLayerContext *l,
                            cb_size >> sps->vshift[2],
                            &gb, sps->pcm.bit_depth_chroma);
     }
+#endif
 
     return 0;
 }
@@ -1788,6 +1812,7 @@ static void luma_mc_bi(HEVCLocalContext *lc,
 
 }
 
+#ifdef HEVC_CHROMA_DECODE
 /**
  * 8.5.3.2.2.2 Chroma sample uniprediction interpolation process
  *
@@ -1967,6 +1992,7 @@ static void chroma_mc_bi(HEVCLocalContext *lc,
                                                          s->sh.chroma_offset_l1[current_mv->ref_idx[1]][cidx],
                                                          _mx1, _my1, block_w);
 }
+#endif
 
 static void hevc_await_progress(const HEVCContext *s, const HEVCFrame *ref,
                                 const Mv *mv, int y0, int height)
@@ -2045,8 +2071,10 @@ static void hls_prediction_unit(HEVCLocalContext *lc,
     const HEVCFrame *ref0 = NULL, *ref1 = NULL;
     const int *linesize = s->cur_frame->f->linesize;
     uint8_t *dst0 = POS(0, x0, y0);
+#ifdef HEVC_CHROMA_DECODE
     uint8_t *dst1 = POS(1, x0, y0);
     uint8_t *dst2 = POS(2, x0, y0);
+#endif
     int log2_min_cb_size = sps->log2_min_cb_size;
     int min_cb_width     = sps->min_cb_width;
     int x_cb             = x0 >> log2_min_cb_size;
@@ -2093,16 +2121,19 @@ static void hls_prediction_unit(HEVCLocalContext *lc,
     }
 
     if (current_mv.pred_flag == PF_L0) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> sps->hshift[1];
         int y0_c = y0 >> sps->vshift[1];
         int nPbW_c = nPbW >> sps->hshift[1];
         int nPbH_c = nPbH >> sps->vshift[1];
+#endif
 
         luma_mc_uni(lc, pps, sps, dst0, linesize[0], ref0->f,
                     &current_mv.mv[0], x0, y0, nPbW, nPbH,
                     s->sh.luma_weight_l0[current_mv.ref_idx[0]],
                     s->sh.luma_offset_l0[current_mv.ref_idx[0]]);
 
+#ifdef HEVC_CHROMA_DECODE
         if (sps->chroma_format_idc) {
             chroma_mc_uni(lc, pps, sps, dst1, linesize[1], ref0->f->data[1], ref0->f->linesize[1],
                           0, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
@@ -2111,17 +2142,21 @@ static void hls_prediction_unit(HEVCLocalContext *lc,
                           0, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
                           s->sh.chroma_weight_l0[current_mv.ref_idx[0]][1], s->sh.chroma_offset_l0[current_mv.ref_idx[0]][1]);
         }
+#endif
     } else if (current_mv.pred_flag == PF_L1) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> sps->hshift[1];
         int y0_c = y0 >> sps->vshift[1];
         int nPbW_c = nPbW >> sps->hshift[1];
         int nPbH_c = nPbH >> sps->vshift[1];
+#endif
 
         luma_mc_uni(lc, pps, sps, dst0, linesize[0], ref1->f,
                     &current_mv.mv[1], x0, y0, nPbW, nPbH,
                     s->sh.luma_weight_l1[current_mv.ref_idx[1]],
                     s->sh.luma_offset_l1[current_mv.ref_idx[1]]);
 
+#ifdef HEVC_CHROMA_DECODE
         if (sps->chroma_format_idc) {
             chroma_mc_uni(lc, pps, sps, dst1, linesize[1], ref1->f->data[1], ref1->f->linesize[1],
                           1, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
@@ -2131,16 +2166,20 @@ static void hls_prediction_unit(HEVCLocalContext *lc,
                           1, x0_c, y0_c, nPbW_c, nPbH_c, &current_mv,
                           s->sh.chroma_weight_l1[current_mv.ref_idx[1]][1], s->sh.chroma_offset_l1[current_mv.ref_idx[1]][1]);
         }
+#endif
     } else if (current_mv.pred_flag == PF_BI) {
+#ifdef HEVC_CHROMA_DECODE
         int x0_c = x0 >> sps->hshift[1];
         int y0_c = y0 >> sps->vshift[1];
         int nPbW_c = nPbW >> sps->hshift[1];
         int nPbH_c = nPbH >> sps->vshift[1];
+#endif
 
         luma_mc_bi(lc, pps, sps, dst0, linesize[0], ref0->f,
                    &current_mv.mv[0], x0, y0, nPbW, nPbH,
                    ref1->f, &current_mv.mv[1], &current_mv);
 
+#ifdef HEVC_CHROMA_DECODE
         if (sps->chroma_format_idc) {
             chroma_mc_bi(lc, pps, sps, dst1, linesize[1], ref0->f, ref1->f,
                          x0_c, y0_c, nPbW_c, nPbH_c, &current_mv, 0);
@@ -2148,6 +2187,7 @@ static void hls_prediction_unit(HEVCLocalContext *lc,
             chroma_mc_bi(lc, pps, sps, dst2, linesize[2], ref0->f, ref1->f,
                          x0_c, y0_c, nPbW_c, nPbH_c, &current_mv, 1);
         }
+#endif
     }
 }
 

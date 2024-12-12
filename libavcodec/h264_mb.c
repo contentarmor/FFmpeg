@@ -219,15 +219,17 @@ static av_always_inline void mc_dir_part(const H264Context *h, H264SliceContext 
     const int luma_xy = (mx & 3) + ((my & 3) << 2);
     ptrdiff_t offset  = (mx >> 2) * (1 << pixel_shift) + (my >> 2) * sl->mb_linesize;
     uint8_t *src_y    = pic->data[0] + offset;
-    uint8_t *src_cb, *src_cr;
     int extra_width  = 0;
     int extra_height = 0;
-    int emu = 0;
     const int full_mx    = mx >> 2;
     const int full_my    = my >> 2;
     const int pic_width  = 16 * h->mb_width;
     const int pic_height = 16 * h->mb_height >> MB_FIELD(sl);
+#ifdef H264_DECODE_CHROMA
+    uint8_t *src_cb, *src_cr;
+    int emu = 0;
     int ysh;
+#endif
 
     if (mx & 7)
         extra_width -= 3;
@@ -244,13 +246,16 @@ static av_always_inline void mc_dir_part(const H264Context *h, H264SliceContext 
                                  16 + 5, 16 + 5 /*FIXME*/, full_mx - 2,
                                  full_my - 2, pic_width, pic_height);
         src_y = sl->edge_emu_buffer + (2 << pixel_shift) + 2 * sl->mb_linesize;
+#ifdef H264_DECODE_CHROMA
         emu   = 1;
+#endif
     }
 
     qpix_op[luma_xy](dest_y, src_y, sl->mb_linesize); // FIXME try variable height perhaps?
     if (!square)
         qpix_op[luma_xy](dest_y + delta, src_y + delta, sl->mb_linesize);
 
+#ifdef H264_DECODE_CHROMA
     if (CONFIG_GRAY && h->flags & AV_CODEC_FLAG_GRAY)
         return;
 
@@ -317,6 +322,7 @@ static av_always_inline void mc_dir_part(const H264Context *h, H264SliceContext 
     }
     chroma_op(dest_cr, src_cr, sl->mb_uvlinesize, height >> (chroma_idc == 1 /* yuv420 */),
               mx & 7, ((unsigned)my << (chroma_idc == 2 /* yuv422 */)) & 7);
+#endif
 }
 
 static av_always_inline void mc_part_std(const H264Context *h, H264SliceContext *sl,
@@ -382,9 +388,12 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
                                               int list0, int list1,
                                               int pixel_shift, int chroma_idc)
 {
+#ifdef H264_DECODE_CHROMA
     int chroma_height;
+#endif
 
     dest_y += (2 * x_offset << pixel_shift) + 2 * y_offset * sl->mb_linesize;
+#ifdef H264_DECODE_CHROMA
     if (chroma_idc == 3 /* yuv444 */) {
         chroma_height     = height;
         chroma_weight_avg = luma_weight_avg;
@@ -400,6 +409,7 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
         dest_cb      += (x_offset << pixel_shift) + y_offset * sl->mb_uvlinesize;
         dest_cr      += (x_offset << pixel_shift) + y_offset * sl->mb_uvlinesize;
     }
+#endif
     x_offset += 8 * sl->mb_x;
     y_offset += 8 * (sl->mb_y >> MB_FIELD(sl));
 
@@ -426,12 +436,14 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
             int weight1 = 64 - weight0;
             luma_weight_avg(dest_y, tmp_y, sl->mb_linesize,
                             height, 5, weight0, weight1, 0);
+#ifdef H264_DECODE_CHROMA
             if (!CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
                 chroma_weight_avg(dest_cb, tmp_cb, sl->mb_uvlinesize,
                                   chroma_height, 5, weight0, weight1, 0);
                 chroma_weight_avg(dest_cr, tmp_cr, sl->mb_uvlinesize,
                                   chroma_height, 5, weight0, weight1, 0);
             }
+#endif
         } else {
             luma_weight_avg(dest_y, tmp_y, sl->mb_linesize, height,
                             sl->pwt.luma_log2_weight_denom,
@@ -439,6 +451,7 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
                             sl->pwt.luma_weight[refn1][1][0],
                             sl->pwt.luma_weight[refn0][0][1] +
                             sl->pwt.luma_weight[refn1][1][1]);
+#ifdef H264_DECODE_CHROMA
             if (!CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
                 chroma_weight_avg(dest_cb, tmp_cb, sl->mb_uvlinesize, chroma_height,
                                   sl->pwt.chroma_log2_weight_denom,
@@ -453,6 +466,7 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
                                   sl->pwt.chroma_weight[refn0][0][1][1] +
                                   sl->pwt.chroma_weight[refn1][1][1][1]);
             }
+#endif
         }
     } else {
         int list     = list1 ? 1 : 0;
@@ -466,6 +480,7 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
                        sl->pwt.luma_log2_weight_denom,
                        sl->pwt.luma_weight[refn][list][0],
                        sl->pwt.luma_weight[refn][list][1]);
+#ifdef H264_DECODE_CHROMA
         if (!CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
             if (sl->pwt.use_weight_chroma) {
                 chroma_weight_op(dest_cb, sl->mb_uvlinesize, chroma_height,
@@ -478,6 +493,7 @@ static av_always_inline void mc_part_weighted(const H264Context *h, H264SliceCon
                                  sl->pwt.chroma_weight[refn][list][1][1]);
             }
         }
+#endif
     }
 }
 
@@ -567,6 +583,7 @@ static av_always_inline void xchg_mb_border(const H264Context *h, H264SliceConte
             XCHG(sl->top_borders[top_idx][sl->mb_x + 1],
                  src_y + (17 << pixel_shift), 1);
         }
+#ifdef H264_DECODE_CHROMA
         if (simple || !CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
             if (chroma444) {
                 if (deblock_topleft) {
@@ -590,6 +607,7 @@ static av_always_inline void xchg_mb_border(const H264Context *h, H264SliceConte
                 XCHG(top_border + (24 << pixel_shift), src_cr + 1 + pixel_shift, 1);
             }
         }
+#endif
     }
 }
 

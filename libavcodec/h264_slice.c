@@ -217,6 +217,7 @@ static int alloc_picture(H264Context *h, H264Picture *pic)
         atomic_init(pic->decode_error_flags, 0);
     }
 
+#ifdef H264_DECODE_CHROMA
     if (CONFIG_GRAY && !h->avctx->hwaccel && h->flags & AV_CODEC_FLAG_GRAY && pic->f->data[2]) {
         int h_chroma_shift, v_chroma_shift;
         av_pix_fmt_get_chroma_sub_sample(pic->f->format,
@@ -229,6 +230,7 @@ static int alloc_picture(H264Context *h, H264Picture *pic)
                    0x80, AV_CEIL_RSHIFT(pic->f->width, h_chroma_shift));
         }
     }
+#endif
 
     if (!h->qscale_table_pool) {
         ret = init_table_pools(h);
@@ -584,8 +586,10 @@ static av_always_inline void backup_mb_border(const H264Context *h, H264SliceCon
     uint8_t *top_border;
     int top_idx = 1;
     const int pixel_shift = h->pixel_shift;
+#ifdef H264_DECODE_CHROMA
     int chroma444 = CHROMA444(h);
     int chroma422 = CHROMA422(h);
+#endif
 
     src_y  -= linesize;
     src_cb -= uvlinesize;
@@ -598,6 +602,7 @@ static av_always_inline void backup_mb_border(const H264Context *h, H264SliceCon
                 AV_COPY128(top_border, src_y + 15 * linesize);
                 if (pixel_shift)
                     AV_COPY128(top_border + 16, src_y + 15 * linesize + 16);
+#ifdef H264_DECODE_CHROMA
                 if (simple || !CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
                     if (chroma444) {
                         if (pixel_shift) {
@@ -627,6 +632,7 @@ static av_always_inline void backup_mb_border(const H264Context *h, H264SliceCon
                         }
                     }
                 }
+#endif
             }
         } else if (MB_MBAFF(sl)) {
             top_idx = 0;
@@ -641,6 +647,7 @@ static av_always_inline void backup_mb_border(const H264Context *h, H264SliceCon
     if (pixel_shift)
         AV_COPY128(top_border + 16, src_y + 16 * linesize + 16);
 
+#ifdef H264_DECODE_CHROMA
     if (simple || !CONFIG_GRAY || !(h->flags & AV_CODEC_FLAG_GRAY)) {
         if (chroma444) {
             if (pixel_shift) {
@@ -670,6 +677,7 @@ static av_always_inline void backup_mb_border(const H264Context *h, H264SliceCon
             }
         }
     }
+#endif
 }
 
 /**
@@ -2566,8 +2574,12 @@ static int decode_slice(struct AVCodecContext *avctx, void *arg)
     if (h->postpone_filter)
         sl->deblocking_filter = 0;
 
+#ifdef H264_DECODE_CHROMA
     sl->is_complex = FRAME_MBAFF(h) || h->picture_structure != PICT_FRAME ||
                      (CONFIG_GRAY && (h->flags & AV_CODEC_FLAG_GRAY));
+#else
+    sl->is_complex = 1;
+#endif
 
     if (!(h->avctx->active_thread_type & FF_THREAD_SLICE) && h->picture_structure == PICT_FRAME && sl->er->error_status_table) {
         const int start_i  = av_clip(sl->resync_mb_x + sl->resync_mb_y * h->mb_width, 0, h->mb_num - 1);
