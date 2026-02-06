@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ -f /opt/rh/devtoolset-11/enable ]; then
+    source /opt/rh/devtoolset-11/enable
+elif [ -f /opt/rh/devtoolset-7/enable ]; then
+    source /opt/rh/devtoolset-7/enable
+fi
+
 if [ -z ${COMPILER} ]; then
     COMPILER="g++"
 fi
