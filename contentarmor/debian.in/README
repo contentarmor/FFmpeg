@@ -1,0 +1,10 @@
+The Package #<PKG_NAME>#
+----------------------------
+
+The #<PKG_NAME># package install FFmpeg shared libraries generated from vanilla FFmpeg sources.
+
+The #<PKG_NAME># has been compiled with the following commands :
+    #<CONFIGURE_COMMAND>#
+    #<MAKE_COMMAND>#
+
+ -- Synamedia ContentArmor Watermarking <stf-support@synamedia.com>
