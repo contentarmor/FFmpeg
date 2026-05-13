@@ -1755,6 +1755,33 @@ static void fix_frag_index_entries(MOVFragmentIndex *frag_index, int index,
     }
 }
 
+static void trim_frag_index_entries(MOVFragmentIndex *frag_index, int id, int entries)
+{
+    // This is called when entries are removed from the beginning of the index,
+    // so all entries need to be shifted down by "entries" and any that become negative need to be set to -1.
+    int i;
+
+    if (entries <= 0)
+        return;
+
+    for (i = 0; i < frag_index->nb_items; i++) {
+        MOVFragmentStreamInfo *frag_stream_info = get_frag_stream_info(frag_index, i, id);
+        if (!frag_stream_info)
+            continue;
+
+        if (frag_stream_info->index_entry >= 0) {
+            frag_stream_info->index_entry -= entries;
+            if (frag_stream_info->index_entry < 0)
+                frag_stream_info->index_entry = -1;
+        }
+        if (frag_stream_info->index_base >= 0) {
+            frag_stream_info->index_base -= entries;
+            if (frag_stream_info->index_base < 0)
+                frag_stream_info->index_base = -1;
+        }
+    }
+}
+
 static int mov_read_moof(MOVContext *c, AVIOContext *pb, MOVAtom atom)
 {
     // Set by mov_read_tfhd(). mov_read_trun() will reject files missing tfhd.
@@ -5745,6 +5772,44 @@ static int mov_read_trun(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     }
     if (entries == 0)
         return 0;
+
+    // If the trun has more entries than the max_index_size allows,
+    // then we need to drop some entries from the beginning of the stream.
+    // This is needed to support very long streams with many fragments,
+    // where the index_entries can grow indefinitely.
+    // By dropping entries from the beginning, we can keep the index size within limits.
+    if (c->fc->max_index_size > 0 && index_entry_pos == sti->nb_index_entries) {
+        const unsigned int max_entries = FFMAX(1U, c->fc->max_index_size / sizeof(AVIndexEntry));
+        if ((uint64_t)sti->nb_index_entries + entries > max_entries && sc->current_sample > 0) {
+            // Keep at least the last 128 samples, plus any samples that are still being consumed by the decoder.
+            const int keep_consumed = FFMAX(st->codecpar->video_delay + 64, 128);
+            const int needed_drop = (int)((uint64_t)sti->nb_index_entries + entries - max_entries);
+            const int preferred_drop = FFMAX(0, sc->current_sample - keep_consumed);
+            const int drop = FFMIN(sc->current_sample, FFMAX(needed_drop, preferred_drop));
+
+            if (drop > 0) {
+                // Drop the first 'drop' entries from index_entries and ctts_data
+                memmove(sti->index_entries,
+                        sti->index_entries + drop,
+                        sizeof(*sti->index_entries) * (sti->nb_index_entries - drop));
+                memmove(sc->ctts_data,
+                        sc->ctts_data + drop,
+                        sizeof(*sc->ctts_data) * (sc->ctts_count - drop));
+
+                        // Update the counters and positions to reflect the dropped entries
+                sti->nb_index_entries -= drop;
+                sc->ctts_count -= drop;
+                sc->current_sample -= drop;
+                sc->current_index = FFMAX(0, sc->current_index - drop);
+                index_entry_pos -= drop;
+                if (index_entry_pos < 0)
+                    index_entry_pos = 0;
+
+                // Also update the frag_index entries for all fragments that reference the dropped entries.
+                trim_frag_index_entries(&c->frag_index, frag->track_id, drop);
+            }
+        }
+    }
 
     requested_size = (sti->nb_index_entries + entries) * sizeof(AVIndexEntry);
     new_entries = av_fast_realloc(sti->index_entries,
