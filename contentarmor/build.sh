@@ -9,7 +9,7 @@ FFMPEG_BUILD_DIR="${ROOT_DIR}/ffmpeg_out"
 
 DEBFULLNAME="Synamedia ContentArmor Watermarking"
 DEBEMAIL="stf-support@synamedia.com"
-PKG_VERS="1.5.0"
+PKG_VERS="1.5.1"
 CONTENT_ARMOR_HOME="/cafvm"
 FFMPEG_BUILD_LIB="./ffmpeg_out/lib"
 OUT_DEBS_DIR="./debs"
