@@ -9,7 +9,7 @@ FFMPEG_BUILD_DIR="${ROOT_DIR}/ffmpeg_out"
 
 DEBFULLNAME="Synamedia ContentArmor Watermarking"
 DEBEMAIL="stf-support@synamedia.com"
-PKG_VERS="1.5.1"
+PKG_VERS="1.5.2"
 CONTENT_ARMOR_HOME="/cafvm"
 FFMPEG_BUILD_LIB="./ffmpeg_out/lib"
 OUT_DEBS_DIR="./debs"
@@ -50,7 +50,14 @@ else
 fi
 
 CONFIGURE_COMMAND="./configure --enable-shared --disable-doc --disable-programs --disable-static --prefix=${FFMPEG_BUILD_DIR} --cc=$CC --cxx=$CXX --ld=$LD --ar=$AR"
-MAKE_COMMAND="make -j16"
+
+BUILD_ARCH=$(uname -m)
+if [ "${BUILD_ARCH}" = "aarch64" ]; then
+    # armv8.2-a is the baseline of the AWS Graviton processors.
+    CONFIGURE_COMMAND="${CONFIGURE_COMMAND} --arch=aarch64 --extra-cflags=-march=armv8.2-a"
+fi
+
+MAKE_COMMAND="make -j$(nproc)"
 
 function clean
 {
@@ -70,7 +77,7 @@ function clean_all
     clean "${FFMPEG_SRC_DELIVERY}"
     clean "${FFMPEG_SRC_DELIVERY}.tgz"
     rm -f rpmbuild/SPECS/libffmpeg${FFMPEG_VERSION}*-ca.spec
-    clean rpmbuild/RPMS/x86_64
+    clean rpmbuild/RPMS/${BUILD_ARCH}
     clean rpmbuild/SRPMS
     clean rpmbuild/SOURCES
     clean rpmbuild/BUILD

@@ -17,3 +17,5 @@ To compile and generate the RPM package, do :
     build.sh rpm
 
 By default build.sh compile FFmpeg source with g++ and provide a debian package named libffmpeg4.3-ca_<PACKAGE_VERSION>
+
+The package is built for the architecture of the build machine. To get the aarch64 package, run build.sh on an aarch64 machine (ex: an AWS Graviton instance running Amazon Linux 2023): the sources are then configured with --arch=aarch64 and -march=armv8.2-a, and the package is named libffmpeg<FFMPEG_VERSION>-ca-<PACKAGE_VERSION>-1.aarch64.rpm
